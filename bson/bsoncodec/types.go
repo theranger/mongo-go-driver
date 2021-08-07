@@ -8,6 +8,7 @@ package bsoncodec
 
 import (
 	"encoding/json"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
 	"net/url"
 	"reflect"
 	"time"
@@ -62,6 +63,7 @@ var tProxy = reflect.TypeOf((*Proxy)(nil)).Elem()
 var tBinary = reflect.TypeOf(primitive.Binary{})
 var tUndefined = reflect.TypeOf(primitive.Undefined{})
 var tOID = reflect.TypeOf(primitive.ObjectID{})
+var tUUID = reflect.TypeOf(uuid.UUID{})
 var tDateTime = reflect.TypeOf(primitive.DateTime(0))
 var tNull = reflect.TypeOf(primitive.Null{})
 var tRegex = reflect.TypeOf(primitive.Regex{})

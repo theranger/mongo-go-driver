@@ -20,6 +20,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
 )
 
 var (
@@ -82,6 +83,7 @@ func (dvd DefaultValueDecoders) RegisterDefaultDecoders(rb *RegistryBuilder) {
 		RegisterTypeDecoder(tEmpty, defaultEmptyInterfaceCodec).
 		RegisterTypeDecoder(tCoreArray, defaultArrayCodec).
 		RegisterTypeDecoder(tOID, decodeAdapter{dvd.ObjectIDDecodeValue, dvd.objectIDDecodeType}).
+		RegisterTypeDecoder(tUUID, decodeAdapter{dvd.UUIDDecodeValue, dvd.uuIDDecodeType}).
 		RegisterTypeDecoder(tDecimal, decodeAdapter{dvd.Decimal128DecodeValue, dvd.decimal128DecodeType}).
 		RegisterTypeDecoder(tJSONNumber, decodeAdapter{dvd.JSONNumberDecodeValue, dvd.jsonNumberDecodeType}).
 		RegisterTypeDecoder(tURL, decodeAdapter{dvd.URLDecodeValue, dvd.urlDecodeType}).
@@ -771,6 +773,64 @@ func (dvd DefaultValueDecoders) ObjectIDDecodeValue(dc DecodeContext, vr bsonrw.
 	}
 
 	elem, err := dvd.objectIDDecodeType(dc, vr, tOID)
+	if err != nil {
+		return err
+	}
+
+	val.Set(elem)
+	return nil
+}
+
+func (dvd DefaultValueDecoders) uuIDDecodeType(dc DecodeContext, vr bsonrw.ValueReader, t reflect.Type) (reflect.Value, error) {
+	if t != tUUID {
+		return emptyValue, ValueDecoderError{
+			Name:     "UUIDDecodeValue",
+			Types:    []reflect.Type{tUUID},
+			Received: reflect.Zero(t),
+		}
+	}
+
+	var err error
+	var data []byte
+	var subtype byte
+	switch vrType := vr.Type(); vrType {
+	case bsontype.Binary:
+		data, subtype, err = vr.ReadBinary()
+		if err != nil {
+			return emptyValue, err
+		}
+		if subtype != bsontype.BinaryUUID {
+			return emptyValue, fmt.Errorf("decoding UUID requires binary type %v (got %v)", bsontype.BinaryUUID, subtype)
+		}
+		if len(data) != 16 {
+			return emptyValue, fmt.Errorf("decoding UUID requires 16 bytes, (got %v)", len(data))
+		}
+	case bsontype.Null:
+		err = vr.ReadNull()
+	case bsontype.Undefined:
+		err = vr.ReadUndefined()
+	default:
+		return emptyValue, fmt.Errorf("cannot decode %v into an UUID", vrType)
+	}
+
+	if err != nil {
+		return emptyValue, err
+	}
+
+	var elem uuid.UUID
+	for idx := 0; idx < 16; idx++ {
+		elem[idx] = data[idx]
+	}
+
+	return reflect.ValueOf(elem), nil
+}
+
+func (dvd DefaultValueDecoders) UUIDDecodeValue(dc DecodeContext, vr bsonrw.ValueReader, val reflect.Value) error {
+	if !val.CanSet() || val.Type() != tUUID {
+		return ValueDecoderError{Name: "UUIDDecodeValue", Types: []reflect.Type{tUUID}, Received: val}
+	}
+
+	elem, err := dvd.uuIDDecodeType(dc, vr, tUUID)
 	if err != nil {
 		return err
 	}

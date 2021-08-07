@@ -72,6 +72,7 @@ func (dve DefaultValueEncoders) RegisterDefaultEncoders(rb *RegistryBuilder) {
 		RegisterTypeEncoder(tEmpty, defaultEmptyInterfaceCodec).
 		RegisterTypeEncoder(tCoreArray, defaultArrayCodec).
 		RegisterTypeEncoder(tOID, ValueEncoderFunc(dve.ObjectIDEncodeValue)).
+		RegisterTypeEncoder(tUUID, ValueEncoderFunc(dve.UUIDEncodeValue)).
 		RegisterTypeEncoder(tDecimal, ValueEncoderFunc(dve.Decimal128EncodeValue)).
 		RegisterTypeEncoder(tJSONNumber, ValueEncoderFunc(dve.JSONNumberEncodeValue)).
 		RegisterTypeEncoder(tURL, ValueEncoderFunc(dve.URLEncodeValue)).
@@ -206,6 +207,18 @@ func (dve DefaultValueEncoders) ObjectIDEncodeValue(ec EncodeContext, vw bsonrw.
 		return ValueEncoderError{Name: "ObjectIDEncodeValue", Types: []reflect.Type{tOID}, Received: val}
 	}
 	return vw.WriteObjectID(val.Interface().(primitive.ObjectID))
+}
+
+func (dve DefaultValueEncoders) UUIDEncodeValue(ec EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Type() != tUUID {
+		return ValueEncoderError{Name: "UUIDEncodeValue", Types: []reflect.Type{tUUID}, Received: val}
+	}
+
+	data := make([]byte, 16)
+	for idx := 0; idx < val.Len(); idx++ {
+		data[idx] = val.Index(idx).Interface().(byte)
+	}
+	return vw.WriteBinaryWithSubtype(data, bsontype.BinaryUUID)
 }
 
 // Decimal128EncodeValue is the ValueEncoderFunc for primitive.Decimal128.
